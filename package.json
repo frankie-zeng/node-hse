@@ -1,0 +1,29 @@
+{
+  "name": "hse",
+  "version": "1.0.0",
+  "description": "S32K HSE service generate library",
+  "main": "index.js",
+  "scripts": {
+    "test": "mocha"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/frankie-zeng/node-hse.git"
+  },
+  "keywords": [
+    "s32k",
+    "hse",
+    "openssl"
+  ],
+  "author": "Frankie Zeng",
+  "license": "MIT",
+  "gypfile": true,
+  "bugs": {
+    "url": "https://github.com/frankie-zeng/node-hse/issues"
+  },
+  "homepage": "https://github.com/frankie-zeng/node-hse#readme",
+  "dependencies": {
+    "mocha": "^8.3.2",
+    "node-addon-api": "^3.1.0"
+  }
+}
