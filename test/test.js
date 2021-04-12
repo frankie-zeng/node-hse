@@ -1,4 +1,6 @@
 var assert = require('assert');
+var crypto = require('crypto');
+const { sheKey } = require('./../index');
 var hse = require('./../index');
 describe('HSE', function() {
   describe('#HSE test()', function() {
@@ -96,6 +98,65 @@ y3Uv31Ek6iHz/mUmz1uC28ich/lcaNwcYYyODiWE/upq6KEFfwL0QCU=
         }
         var ret=hse.importPrivKey(0x40000,hse.GET_KEY_HANDLE(hse.HSE_KEY_CATALOG_ID_NVM,0,0),keyInfo,rsaPrivKey)
         assert.equal(0,ret.err,ret.msg)
+    });
+  });
+  describe('#getGmac()', function() {
+    it('should equal', function() {
+        key = Buffer.from('be45cb2605bf36bebde684841a28f0fd43c69850a3dce5fedba69928ee3a8991','hex');
+        iv = Buffer.from('f7a093cd1ce82f11bc318b3e','hex');
+        aad = Buffer.alloc(240,0)
+        aad.writeUInt32LE(0x5aa55aa5,0)
+        aad.writeUInt32LE(1,4)
+        aad.writeUInt32LE(0x00401000,12)
+        auth_tag =  Buffer.from('e009b70864ecfe4e5262432f13d5ba97','hex')
+        assert.equal(Buffer.compare(hse.gmac(key,aad,iv),auth_tag),0)
+    });
+    it('general test', function() {
+        console.log(hse.importSheKey(0x40000,hse.sheKey.MASTER_ECU_KEY,Buffer.alloc(16,0),hse.sheKey.BOOT_MAC,Buffer.alloc(16,2),{
+            VERIFY_ONLY:true
+        },1,Buffer.alloc(8,0)))
+    });
+
+  });
+  describe('#setAttr()', function() {
+    it('debug auth mode', function() {
+        console.log(hse.setDebugAuthMode(0x40000,1))
+    });
+  });
+  describe('#smrInstallWithoutData()', function() {
+    it('one pass mode', function() {
+        console.log(hse.smrInstallWithoutData(0x40000,{
+            pSmrSrc:0x40000,
+            smrSize:1000,
+            configFlags:hse.HSE_SMR_CFG_FLAG_INSTALL_AUTH,
+            verifMethod:hse.HSE_SMR_VERIF_PRE_BOOT_MASK,
+            checkPeriod:0,
+            keyHandle:hse.GET_KEY_HANDLE(hse.HSE_KEY_CATALOG_ID_NVM,0,0),
+            pInstAuthTag:[0,0]
+        },{
+            accessMode:hse.HSE_ACCESS_MODE_ONE_PASS,
+            entryIndex:0,
+            pSmrData:0x40000,
+            smrDataLength:1000,
+        },[Buffer.alloc(16,1),Buffer.alloc(15,2)]))
+    });
+  });
+  describe('#smrInstallWithData()', function() {
+    it('one pass mode', function() {
+        console.log(hse.smrInstallWithData(0x40000,{
+            pSmrSrc:0x40000,
+            smrSize:1000,
+            configFlags:hse.HSE_SMR_CFG_FLAG_INSTALL_AUTH,
+            verifMethod:hse.HSE_SMR_VERIF_PRE_BOOT_MASK,
+            checkPeriod:0,
+            keyHandle:hse.GET_KEY_HANDLE(hse.HSE_KEY_CATALOG_ID_NVM,0,0),
+            pInstAuthTag:[0,0]
+        },{
+            accessMode:hse.HSE_ACCESS_MODE_ONE_PASS,
+            entryIndex:0,
+            smrData:Buffer.alloc(100,2),
+            smrDataLength:1000,
+        },[Buffer.alloc(16,1),Buffer.alloc(15,2)]))
     });
   });
 });
