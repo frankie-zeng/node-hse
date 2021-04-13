@@ -33,6 +33,12 @@ Napi::Object HSE::Init(Napi::Env env, Napi::Object exports) {
       DefineClass(env,
                   "HSE",
                   {
+                    DECLARE_NAPI_UINT32(HSE_APP_CORE0),
+                    DECLARE_NAPI_UINT32(HSE_APP_CORE1),
+                    DECLARE_NAPI_UINT32(HSE_CR_SANCTION_DIS_INDIV_KEYS),
+                    DECLARE_NAPI_UINT32(HSE_CR_SANCTION_KEEP_CORE_IN_RESET),
+                    DECLARE_NAPI_UINT32(HSE_CR_SANCTION_RESET_SOC),
+                    DECLARE_NAPI_UINT32(HSE_CR_SANCTION_DIS_ALL_KEYS),
                     DECLARE_NAPI_UINT32(HSE_ACCESS_MODE_ONE_PASS),
                     DECLARE_NAPI_UINT32(HSE_ACCESS_MODE_START),
                     DECLARE_NAPI_UINT32(HSE_ACCESS_MODE_UPDATE),
@@ -198,6 +204,7 @@ Napi::Object HSE::Init(Napi::Env env, Napi::Object exports) {
                     InstanceMethod("setAttr", &HSE::setAttr),
                     InstanceMethod("smrInstallWithData", &HSE::smrInstallWithData),
                     InstanceMethod("smrInstallWithoutData", &HSE::smrInstallWithoutData),
+                    InstanceMethod("crInstall", &HSE::crInstall),
                    });
 
   constructor = Napi::Persistent(func);
@@ -225,44 +232,51 @@ static char* getErrorMsg(unsigned long err){
 static Napi::Buffer<uint8_t> hseAuthScheme(Napi::Env env,hseAuthScheme_t* s,Napi::Object o,uint32_t alloffset){
 
     std::string type=o.Get("type").ToString();
-     Napi::Buffer<uint8_t> ret=Napi::Buffer<uint8_t>::New(env,0);;
+     
     if(type.compare("xcbc_mac")==0){
         s->macScheme.macAlgo=HSE_MAC_ALGO_XCBC_MAC;
+        return Napi::Buffer<uint8_t>::New(env,0);
     }else if(type.compare("cmac-aes")==0){
         s->macScheme.macAlgo=HSE_MAC_ALGO_CMAC;
         s->macScheme.sch.cmac.cipherAlgo=HSE_CIPHER_ALGO_AES;
+        return Napi::Buffer<uint8_t>::New(env,0);
     }else if(type.compare("cmac-tdes")==0){
         s->macScheme.macAlgo=HSE_MAC_ALGO_CMAC;
         s->macScheme.sch.cmac.cipherAlgo=HSE_CIPHER_ALGO_3DES;
+        return Napi::Buffer<uint8_t>::New(env,0);
     }else if(type.compare("gmac")==0){
         s->macScheme.macAlgo=HSE_MAC_ALGO_GMAC;
         Napi::Buffer<uint8_t> iv=o.Get("iv").As<Napi::Buffer<uint8_t>>();
         s->macScheme.sch.gmac.ivLength=iv.Length();
         s->macScheme.sch.gmac.pIV=(HOST_ADDR)alloffset;
-        ret=Napi::Buffer<uint8_t>::New(env,iv.Data(),iv.Length());
+        return Napi::Buffer<uint8_t>::Copy(env,iv.Data(),iv.Length());
     }else if(type.compare("hmac")==0){
         s->macScheme.macAlgo=HSE_MAC_ALGO_HMAC;
         s->macScheme.sch.hmac.hashAlgo=o.Get("hashAlgo").ToNumber().Uint32Value();
+        return Napi::Buffer<uint8_t>::New(env,0);
     }else if(type.compare("rsa-pss")==0){
         s->sigScheme.signSch=HSE_SIGN_RSASSA_PSS;
         s->sigScheme.sch.rsaPss.hashAlgo=o.Get("hashAlgo").ToNumber().Uint32Value();
         s->sigScheme.sch.rsaPss.saltLength=o.Get("saltLength").ToNumber().Uint32Value();
+        return Napi::Buffer<uint8_t>::New(env,0);
     }else if(type.compare("rsa-pkcs")==0){
         s->sigScheme.signSch=HSE_SIGN_RSASSA_PKCS1_V15;
         s->sigScheme.sch.rsaPss.hashAlgo=o.Get("hashAlgo").ToNumber().Uint32Value();
+        return Napi::Buffer<uint8_t>::New(env,0);
     }else if(type.compare("ecdsa")==0){
         s->sigScheme.signSch=HSE_SIGN_ECDSA;
         s->sigScheme.sch.ecdsa.hashAlgo=o.Get("hashAlgo").ToNumber().Uint32Value();
+        return Napi::Buffer<uint8_t>::New(env,0);
     }else if(type.compare("eddsa")==0){
         s->sigScheme.signSch=HSE_SIGN_EDDSA;
         s->sigScheme.sch.eddsa.bHashEddsa=o.Get("bHashEddsa").ToBoolean().Value();
         Napi::Buffer<uint8_t> context=o.Get("context").As<Napi::Buffer<uint8_t>>();
         s->sigScheme.sch.eddsa.contextLength=context.Length();
         s->sigScheme.sch.eddsa.pContext=(HOST_ADDR)alloffset;
-        ret=Napi::Buffer<uint8_t>::New(env,context.Data(),context.Length());
+        return Napi::Buffer<uint8_t>::Copy(env,context.Data(),context.Length());
     }
 
-    return ret;
+    return Napi::Buffer<uint8_t>::New(env,0);
 }
 
 static hseEccCurveId_t getCurveId(int id){
@@ -862,7 +876,7 @@ Napi::Value HSE::smrInstallWithoutData(const Napi::CallbackInfo& info){
     smr.checkPeriod=smrEntry.Get("checkPeriod").ToNumber().Uint32Value();
     smr.keyHandle=smrEntry.Get("keyHandle").ToNumber().Uint32Value();
     Napi::Array initTag = Napi::Array::Array(info.Env(),smrEntry.Get("pInstAuthTag"));
-    Napi::Object scheme =  smrEntry.Get("keyHandle").ToObject();
+    Napi::Object scheme =  smrEntry.Get("authScheme").ToObject();
     for(int i=0;i<2;i++){
         Napi::Value v=initTag[i];
         smr.pInstAuthTag[i]=v.ToNumber().Uint32Value();
@@ -942,7 +956,7 @@ Napi::Value HSE::smrInstallWithData(const Napi::CallbackInfo& info){
     smr.checkPeriod=smrEntry.Get("checkPeriod").ToNumber().Uint32Value();
     smr.keyHandle=smrEntry.Get("keyHandle").ToNumber().Uint32Value();
     Napi::Array initTag = Napi::Array::Array(info.Env(),smrEntry.Get("pInstAuthTag"));
-    Napi::Object scheme =  smrEntry.Get("keyHandle").ToObject();
+    Napi::Object scheme =  smrEntry.Get("authScheme").ToObject();
     for(int i=0;i<2;i++){
         Napi::Value v=initTag[i];
         smr.pInstAuthTag[i]=v.ToNumber().Uint32Value();
@@ -972,7 +986,43 @@ Napi::Value HSE::smrInstallWithData(const Napi::CallbackInfo& info){
     ret.Set("msg","successful");
     return ret;
 }
+/* data has store in flash, just give point*/
+Napi::Value HSE::crInstall(const Napi::CallbackInfo& info){
+    hseSrvDescriptor_t service;
+    hseCrEntry_t cr;
 
+    memset((void*)&service,0,sizeof(hseSrvDescriptor_t));
+    memset((void*)&cr,0,sizeof(hseCrEntry_t));
+    Napi::Object ret=Napi::Object::New(info.Env());
+
+    uint32_t offset=info[0].As<Napi::Number>().Uint32Value();
+    uint32_t index=info[1].As<Napi::Number>().Uint32Value();
+    Napi::Object crEntry=info[2].As<Napi::Object>();
+    
+    
+    service.srvId=HSE_SRV_ID_CORE_RESET_ENTRY_INSTALL;
+    
+    cr.coreId=crEntry.Get("coreId").ToNumber().Uint32Value();
+    cr.crSanction=crEntry.Get("crSanction").ToNumber().Uint32Value();
+    cr.smrVerifMap=crEntry.Get("smrVerifMap").ToNumber().Uint32Value();
+    cr.pPassReset=crEntry.Get("pPassReset").ToNumber().Uint32Value();
+    cr.altSmrVerifMap=crEntry.Get("altSmrVerifMap").ToNumber().Uint32Value();
+    cr.pAltReset=crEntry.Get("pAltReset").ToNumber().Uint32Value();
+    
+    //address assign
+    service.hseSrv.crEntryInstallReq.crEntryIndex=index;
+    service.hseSrv.crEntryInstallReq.pCrEntry=(HOST_ADDR)(offset+sizeof(hseSrvDescriptor_t));
+    Napi::Buffer<uint8_t> payload=Napi::Buffer<uint8_t>::New(info.Env(),sizeof(hseSrvDescriptor_t)+sizeof(hseCrEntry_t));
+    //*real copy
+    uint8_t* data=payload.Data();
+    memcpy(data,&service,sizeof(hseSrvDescriptor_t));
+    data+=sizeof(hseSrvDescriptor_t);
+    memcpy(data,&cr,sizeof(hseCrEntry_t));
+    ret.Set("err",0);
+    ret.Set("data",payload);
+    ret.Set("msg","successful");
+    return ret;
+}
 
 
 Napi::Object Init(Napi::Env env, Napi::Object exports) {

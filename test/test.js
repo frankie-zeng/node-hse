@@ -132,7 +132,11 @@ y3Uv31Ek6iHz/mUmz1uC28ich/lcaNwcYYyODiWE/upq6KEFfwL0QCU=
             verifMethod:hse.HSE_SMR_VERIF_PRE_BOOT_MASK,
             checkPeriod:0,
             keyHandle:hse.GET_KEY_HANDLE(hse.HSE_KEY_CATALOG_ID_NVM,0,0),
-            pInstAuthTag:[0,0]
+            pInstAuthTag:[0,0],
+            authScheme:{
+                type:'gmac',
+                iv:Buffer.alloc(12,2)
+            }
         },{
             accessMode:hse.HSE_ACCESS_MODE_ONE_PASS,
             entryIndex:0,
@@ -150,13 +154,28 @@ y3Uv31Ek6iHz/mUmz1uC28ich/lcaNwcYYyODiWE/upq6KEFfwL0QCU=
             verifMethod:hse.HSE_SMR_VERIF_PRE_BOOT_MASK,
             checkPeriod:0,
             keyHandle:hse.GET_KEY_HANDLE(hse.HSE_KEY_CATALOG_ID_NVM,0,0),
-            pInstAuthTag:[0,0]
+            pInstAuthTag:[0,0],
+            authScheme:{
+                type:'cmac-aes',
+            }
         },{
             accessMode:hse.HSE_ACCESS_MODE_ONE_PASS,
             entryIndex:0,
-            smrData:Buffer.alloc(100,2),
+            smrData:Buffer.alloc(200,2),
             smrDataLength:1000,
         },[Buffer.alloc(16,1),Buffer.alloc(15,2)]))
     });
+  });
+  describe('#crInstall()', function() {
+    it('crInatall index 0', function() {
+        console.log(hse.crInstall(0x40000,0,{
+            coreId:hse.HSE_APP_CORE0,
+            crSanction:hse.HSE_CR_SANCTION_DIS_INDIV_KEYS,
+            smrVerifMap:1,
+            pPassReset:0x4000,
+            altSmrVerifMap:2,
+            pAltReset:0x50000,
+        }));
+    })
   });
 });
